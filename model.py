@@ -36,7 +36,7 @@ import helpers
 # Constants
 
 POSSIBLE_PRIORITIES     = {'prestige':.6, 'cost':.4}
-FAMILY_PRIORITY_WEIGHTS = [.3, .3, .3]
+FAMILY_PRIORITY_WEIGHTS = {'Prestige':.3, 'Efficacy':.3, 'Cost':.3}
 MAX_ENDOWMENT_DRAW      = .1  # Most schools draw ~5%. Drawing more than ENDOWMENT_GROWTH_RATE should decrease endowment over time.
 NUM_SIMULATIONS         = 1
 NUM_TIME_STEPS          = 5
@@ -74,7 +74,7 @@ class SchoolModel(Model):
             # TO DO: Implement in a seperate function?
             endowment      = scipy.stats.expon().rvs(1)[0] #random.randint(0,100)
             prestige       = np.abs(np.random.normal(0, 1, 1)[0])
-            tuition        = (prestige / 2) # Cost is directly related to prestige.
+            tuition        = prestige
             annual_fund    = random.randint(0,100)
             efficacy       = np.abs(np.random.normal(0, 1, 1)[0])
             priorities     = helpers.make_random_school_priorities()
@@ -89,7 +89,7 @@ class SchoolModel(Model):
             # more schools closer to 1D center.
             location       = np.random.normal(0, 100, 1)[0]
 
-            a = agents.SchoolAgent(i, self, 
+            a_school = agents.SchoolAgent(i, self, 
                             endowment,  
                             prestige, 
                             tuition,
@@ -98,7 +98,7 @@ class SchoolModel(Model):
                             endowment_draw,
                             priorities,
                             location)
-            self.schedule.add(a)
+            self.schedule.add(a_school)
 
     def step(self, i):
         # schools= [obj for obj in self.schedule._agents.values() if isinstance(obj, agents.SchoolAgent)]
@@ -106,38 +106,35 @@ class SchoolModel(Model):
 
 
         # Each step, create new families.
-        # print(i)
-        start = self.num_schools  + i * self.num_families
-        end   = self.num_schools  + (i + 1) * self.num_families #(self.num_schools  + self.num_families) * (i+1)
-        # print(self.num_families)
-        # print('start', 'end', start, end)
+        start_id = self.num_schools  + self.num_families * i  # Give unique family id.
+        end_id   = self.num_schools  + self.num_families * (i + 1)
 
-        for j in range(start, end): # Need to have unique ids.
+        for j in range(start_id, end_id): # Need to have unique ids.
 
             # A randomly initialized wealth. As per https://arxiv.org/pdf/cond-mat/0103544,
             # most American's have wealth following exponential distribution.
             # A rough estimation. Here there are no <50 values.
             # TO DO: Think about financial aid.
-            wealth   = scipy.stats.expon(50,200).rvs(1)[0]
+            wealth    = scipy.stats.expon(50,200).rvs(1)[0]
             
             # What is their top priority? TO DO: Make priorities a weighted average where
             # they care about all priorities but individual families have different weightings.
-            priorities = helpers.make_random_family_priorities()
+            priorities = helpers.make_random_family_priorities(self)
             # print('Family {} has these priorities {}'.format(j, priority))
             # Where they live. Most people live in median place. This is simulating
             # cities versus rural living.
             location = np.random.normal(0, 100, 1)[0] # Set a school in city close to 0, remote farther from there.
-            # TO DO, have schools choose or set location based on some more intelligent game theoretic model.
+            # TO DO, have schools choose or set location based on some more intelligent (Schelling) game theoretic model.
 
             family   = agents.FamilyAgent(j, self, wealth, priorities, location)
             self.schedule.add(family)
-        # start = end + 1
-        # end   = end + self.num_families
+
         self.schedule.step()
         current_families = [obj for obj in self.schedule._agents.values() if isinstance(obj, agents.FamilyAgent)]
-        print([i.unique_id for i in current_families])
+        # Remove this generation of families. 
         for f in current_families:
-             self.schedule.remove(f) 
+             self.schedule.remove(f)
+        print('Global family priority weights at step {}: {}'.format(i, self.family_priority_weights))
 
 # ______________________________________________________________________________
 # Run model.
